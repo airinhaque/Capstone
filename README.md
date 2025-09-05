@@ -2,7 +2,7 @@
 
 ##  Project Goal
 We are building a **neck-wearable device** that can measure blood pressure **without using the traditional cuff**.  
-Instead, we use **PPG (photoplethysmography) sensors** to calculate **Pulse Transit Time (PTT)** — the time it takes for a pulse wave to travel between two points.  
+Instead, we use **PPG (photoplethysmography) sensors** to calculate **Pulse Transit Time (PTT)**  the time it takes for a pulse wave to travel between two points.  
 
 Other wearables like Apple Watch or WHOOP try to do this, but they are not FDA approved and not accurate enough.  
 Our target is to meet the **AAMI medical standard** (≤ **5 mmHg error**).
