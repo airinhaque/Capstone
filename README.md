@@ -9,14 +9,14 @@ Our target is to meet the **AAMI medical standard** (≤ **5 mmHg error**).
 
 
 
-## 🫀 Why the Neck?
+##  Why the Neck?
 - The **carotid arteries** in the neck give stronger and more reliable signals than the wrist.  
 - This makes our device more accurate than watches or wristbands.  
 - Comfortable to wear and works for continuous monitoring.  
 
 
 
-## ⚙️ System Overview
+## ⚙ System Overview
 
 **Step 1  Sensors**
 - Start with **1 PPG sensor** (test signals).  
