@@ -48,6 +48,31 @@ Our target is to meet the **AAMI medical standard** (≤ **5 mmHg error**).
 - Compare against standard cuff devices.  
 - Must achieve **≤ 5 mmHg error (AAMI standard)**.  
 - Start with students → extend to patients.  
-- Test during normal daily movement.  
+- Test during normal daily movement.
+
+
+
+cd "D:\Projects"
+
+git clone https://github.com/airinhaque/Capstone.git
+cd Capstone
+
+git fetch origin
+git checkout main
+git pull origin main
+
+git checkout -b feat/youssef-blinky2
+
+mkdir firmware
+mkdir firmware\blinky_2
+
+robocopy "D:\Projects\blinky_2" "D:\Projects\Capstone\firmware\blinky_2" /E /XD build .git .west
+
+git status
+git add .
+git commit -m "Add youssef's working blinky_2 firmware (initial import)"
+git push -u origin feat/youssef-blinky2
+
+
 
 
