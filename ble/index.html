@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPG + IMU Sensor Interface</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;600;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #151b2e;
+            --bg-card: #1a2332;
+            --accent-cyan: #00d9ff;
+            --accent-magenta: #ff0080;
+            --accent-yellow: #ffd700;
+            --text-primary: #e8edf4;
+            --text-secondary: #8b95a8;
+            --border: rgba(0, 217, 255, 0.2);
+            --shadow: 0 8px 32px rgba(0, 217, 255, 0.15);
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(0, 217, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 0, 128, 0.08) 0%, transparent 50%);
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2rem;
+        }
+        
+        h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -1px;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            font-family: 'JetBrains Mono', monospace;
+            padding: 0.875rem 1.75rem;
+            border: 2px solid var(--accent-cyan);
+            background: rgba(0, 217, 255, 0.1);
+            color: var(--accent-cyan);
+            font-size: 0.875rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            transition: width 0.6s, height 0.6s, top 0.6s, left 0.6s;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+        }
+        
+        button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        button:hover {
+            color: var(--bg-primary);
+            border-color: var(--accent-cyan);
+        }
+        
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: var(--text-secondary);
+            color: var(--text-secondary);
+        }
+        
+        button:disabled::before {
+            display: none;
+        }
+        
+        .status-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: var(--shadow);
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .status-indicator.connected {
+            background: var(--accent-cyan);
+            box-shadow: 0 0 20px var(--accent-cyan);
+        }
+        
+        .status-indicator.collecting {
+            background: var(--accent-yellow);
+            box-shadow: 0 0 20px var(--accent-yellow);
+        }
+        
+        .status-indicator.transmitting {
+            background: var(--accent-magenta);
+            box-shadow: 0 0 20px var(--accent-magenta);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+        }
+        
+        .status-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            flex: 1;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 217, 255, 0.2);
+        }
+        
+        .card-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            border-left: 3px solid var(--accent-cyan);
+            padding-left: 0.75rem;
+        }
+        
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .chart-container {
+            grid-column: 1 / -1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            min-height: 400px;
+        }
+        
+        canvas {
+            width: 100% !important;
+            height: 350px !important;
+        }
+        
+        .log {
+            grid-column: 1 / -1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            max-height: 300px;
+            overflow-y: auto;
+            color: var(--accent-cyan);
+            line-height: 1.6;
+        }
+        
+        .log::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+        
+        .log::-webkit-scrollbar-thumb {
+            background: var(--accent-cyan);
+            border-radius: 4px;
+        }
+        
+        .log-entry {
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            animation: fadeIn 0.3s ease forwards;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .log-timestamp {
+            color: var(--text-secondary);
+            margin-right: 0.5rem;
+        }
+        
+        .download-section {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ PPG + IMU Sensor Interface</h1>
+            <p class="subtitle">Real-time physiological data acquisition via BLE</p>
+        </header>
+        
+        <div class="controls">
+            <button id="connectBtn">Connect Device</button>
+            <button id="startBtn" disabled>Start Collection</button>
+            <button id="transmitBtn" disabled>Request Transmission</button>
+            <button id="downloadBtn" disabled>Download Data</button>
+            <button id="clearBtn">Clear Charts</button>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <div class="status-text" id="statusText">Disconnected - Click "Connect Device" to begin</div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <div class="card-title">PPG Sensor 1</div>
+                <div class="card-value" id="ppg1Count">0</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">samples</div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">PPG Sensor 2</div>
+                <div class="card-value" id="ppg2Count">0</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">samples</div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">IMU Samples</div>
+                <div class="card-value" id="imuCount">0</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">samples</div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">Temperature</div>
+                <div class="card-value" id="tempValue">--</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">°C</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="card-title">PPG Waveforms</div>
+            <canvas id="ppgChart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <div class="card-title">IMU Accelerometer</div>
+            <canvas id="imuChart"></canvas>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressBar"></div>
+        </div>
+        
+        <div class="log" id="logOutput"></div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // BLE Service UUIDs
+        const SERVICE_UUID = '0000180d-0000-1000-8000-00805f9b34fb';
+        const START_CHAR_UUID = '00002a57-0000-1000-8000-00805f9b34fb';
+        const TRANSMIT_CHAR_UUID = '00002a58-0000-1000-8000-00805f9b34fb';
+        const STATUS_CHAR_UUID = '00002a59-0000-1000-8000-00805f9b34fb';
+        
+        // Phase markers
+        const PHASE_PPG1 = 0xAA;
+        const PHASE_PPG2 = 0xBB;
+        const PHASE_IMU = 0xCC;
+        const PHASE_TEMP = 0xDD;
+        const MAGIC_MARKER = 0xDEADBEEF;
+        
+        // State
+        let bleDevice = null;
+        let bleServer = null;
+        let dataCharacteristic = null;
+        let startCharacteristic = null;
+        let statusCharacteristic = null;
+        
+        let receivedData = new Uint8Array(0);
+        let currentPhase = 'HEADER';
+        let expectedPPGCount = 0;
+        let expectedIMUCount = 0;
+        
+        let ppg1Data = [];
+        let ppg2Data = [];
+        let imuData = [];
+        let temperature = null;
+        
+        // Charts
+        let ppgChart = null;
+        let imuChart = null;
+        
+        // UI Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
+        const transmitBtn = document.getElementById('transmitBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const logOutput = document.getElementById('logOutput');
+        const progressBar = document.getElementById('progressBar');
+        
+        // Initialize charts
+        function initCharts() {
+            const ppgCtx = document.getElementById('ppgChart').getContext('2d');
+            ppgChart = new Chart(ppgCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'PPG Sensor 1',
+                        data: [],
+                        borderColor: '#00d9ff',
+                        backgroundColor: 'rgba(0, 217, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }, {
+                        label: 'PPG Sensor 2',
+                        data: [],
+                        borderColor: '#ff0080',
+                        backgroundColor: 'rgba(255, 0, 128, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e8edf4', font: { family: 'JetBrains Mono' } }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            ticks: { color: '#8b95a8' },
+                            grid: { color: 'rgba(139, 149, 168, 0.1)' }
+                        }
+                    }
+                }
+            });
+            
+            const imuCtx = document.getElementById('imuChart').getContext('2d');
+            imuChart = new Chart(imuCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Accel X',
+                        data: [],
+                        borderColor: '#00d9ff',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }, {
+                        label: 'Accel Y',
+                        data: [],
+                        borderColor: '#ff0080',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }, {
+                        label: 'Accel Z',
+                        data: [],
+                        borderColor: '#ffd700',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e8edf4', font: { family: 'JetBrains Mono' } }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            ticks: { color: '#8b95a8' },
+                            grid: { color: 'rgba(139, 149, 168, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Logging
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span>${message}`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+        
+        // Update status
+        function updateStatus(status, state = '') {
+            statusText.textContent = status;
+            statusIndicator.className = 'status-indicator ' + state;
+        }
+        
+        // Connect to BLE device
+        connectBtn.addEventListener('click', async () => {
+            try {
+                log('Scanning for BLE devices...');
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'PPG_IMU' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                
+                log(`Connecting to ${bleDevice.name}...`);
+                bleServer = await bleDevice.gatt.connect();
+                
+                const service = await bleServer.getPrimaryService(SERVICE_UUID);
+                startCharacteristic = await service.getCharacteristic(START_CHAR_UUID);
+                dataCharacteristic = await service.getCharacteristic(TRANSMIT_CHAR_UUID);
+                statusCharacteristic = await service.getCharacteristic(STATUS_CHAR_UUID);
+                
+                // Subscribe to data notifications
+                await dataCharacteristic.startNotifications();
+                dataCharacteristic.addEventListener('characteristicvaluechanged', handleDataReceived);
+                
+                // Subscribe to status updates
+                await statusCharacteristic.startNotifications();
+                statusCharacteristic.addEventListener('characteristicvaluechanged', handleStatusUpdate);
+                
+                log('✓ Connected successfully!', 'success');
+                updateStatus('Connected - Ready to collect data', 'connected');
+                
+                connectBtn.disabled = true;
+                startBtn.disabled = false;
+                
+            } catch (error) {
+                log(`✗ Connection failed: ${error}`, 'error');
+                updateStatus('Connection failed', '');
+            }
+        });
+        
+        // Start data collection
+        startBtn.addEventListener('click', async () => {
+            try {
+                await startCharacteristic.writeValue(new Uint8Array([1]));
+                log('Started data collection (20 seconds)...');
+                startBtn.disabled = true;
+            } catch (error) {
+                log(`✗ Failed to start collection: ${error}`, 'error');
+            }
+        });
+        
+        // Request data transmission
+        transmitBtn.addEventListener('click', async () => {
+            try {
+                await dataCharacteristic.writeValue(new Uint8Array([1]));
+                log('Requesting data transmission...');
+                transmitBtn.disabled = true;
+                receivedData = new Uint8Array(0);
+                currentPhase = 'HEADER';
+            } catch (error) {
+                log(`✗ Failed to request transmission: ${error}`, 'error');
+            }
+        });
+        
+        // Handle status updates
+        function handleStatusUpdate(event) {
+            const decoder = new TextDecoder();
+            const status = decoder.decode(event.target.value);
+            log(`Status: ${status}`);
+            
+            if (status === 'COLLECTING') {
+                updateStatus('Collecting data...', 'collecting');
+            } else if (status === 'READY') {
+                updateStatus('Collection complete - Ready to transmit', 'connected');
+                transmitBtn.disabled = false;
+            } else if (status === 'TRANSMITTING') {
+                updateStatus('Receiving data...', 'transmitting');
+            } else if (status === 'IDLE') {
+                updateStatus('Transmission complete - Ready for next collection', 'connected');
+                startBtn.disabled = false;
+                downloadBtn.disabled = false;
+                progressBar.style.width = '100%';
+            }
+        }
+        
+        // Handle received data
+        function handleDataReceived(event) {
+            const newData = new Uint8Array(event.target.value.buffer);
+            
+            // Append to buffer
+            const combined = new Uint8Array(receivedData.length + newData.length);
+            combined.set(receivedData);
+            combined.set(newData, receivedData.length);
+            receivedData = combined;
+            
+            // Parse data
+            parseReceivedData();
+        }
+        
+        function parseReceivedData() {
+            if (currentPhase === 'HEADER' && receivedData.length >= 12) {
+                // Parse header: Magic(4) + PPG_Count(4) + IMU_Count(4)
+                const view = new DataView(receivedData.buffer, receivedData.byteOffset);
+                const magic = view.getUint32(0, true);
+                
+                if (magic === MAGIC_MARKER) {
+                    expectedPPGCount = view.getUint32(4, true);
+                    expectedIMUCount = view.getUint32(8, true);
+                    
+                    log(`Header received: ${expectedPPGCount} PPG samples, ${expectedIMUCount} IMU samples`);
+                    
+                    receivedData = receivedData.slice(12);
+                    currentPhase = 'AWAITING_MARKER';
+                    
+                    // Continue parsing if more data available
+                    if (receivedData.length > 0) {
+                        parseReceivedData();
+                    }
+                } else {
+                    log(`✗ Invalid magic marker: 0x${magic.toString(16)}`);
+                }
+            }
+            
+            // Check for phase markers
+            else if (currentPhase === 'AWAITING_MARKER' && receivedData.length >= 1) {
+                const marker = receivedData[0];
+                receivedData = receivedData.slice(1);
+                
+                if (marker === PHASE_PPG1) {
+                    currentPhase = 'PPG1';
+                    ppg1Data = [];
+                    log('Receiving PPG Sensor 1 data...');
+                } else if (marker === PHASE_PPG2) {
+                    currentPhase = 'PPG2';
+                    ppg2Data = [];
+                    log('Receiving PPG Sensor 2 data...');
+                } else if (marker === PHASE_IMU) {
+                    currentPhase = 'IMU';
+                    imuData = [];
+                    log('Receiving IMU data...');
+                } else if (marker === PHASE_TEMP) {
+                    currentPhase = 'TEMP';
+                    log('Receiving temperature data...');
+                } else {
+                    log(`✗ Unknown marker: 0x${marker.toString(16)}`);
+                }
+                
+                // Continue parsing if more data available
+                if (receivedData.length > 0) {
+                    parseReceivedData();
+                }
+            }
+            
+            // Process PPG1 data
+            else if (currentPhase === 'PPG1') {
+                while (receivedData.length >= 4 && ppg1Data.length < expectedPPGCount) {
+                    const view = new DataView(receivedData.buffer, receivedData.byteOffset);
+                    const value = view.getUint32(0, true);
+                    ppg1Data.push(value);
+                    receivedData = receivedData.slice(4);
+                }
+                
+                updateProgress();
+                document.getElementById('ppg1Count').textContent = ppg1Data.length;
+                
+                if (ppg1Data.length === expectedPPGCount) {
+                    log(`✓ PPG Sensor 1 complete: ${ppg1Data.length} samples`);
+                    updatePPGChart();
+                    currentPhase = 'AWAITING_MARKER';
+                    
+                    // Continue parsing if more data available
+                    if (receivedData.length > 0) {
+                        parseReceivedData();
+                    }
+                }
+            }
+            
+            // Process PPG2 data
+            else if (currentPhase === 'PPG2') {
+                while (receivedData.length >= 4 && ppg2Data.length < expectedPPGCount) {
+                    const view = new DataView(receivedData.buffer, receivedData.byteOffset);
+                    const value = view.getUint32(0, true);
+                    ppg2Data.push(value);
+                    receivedData = receivedData.slice(4);
+                }
+                
+                updateProgress();
+                document.getElementById('ppg2Count').textContent = ppg2Data.length;
+                
+                if (ppg2Data.length === expectedPPGCount) {
+                    log(`✓ PPG Sensor 2 complete: ${ppg2Data.length} samples`);
+                    updatePPGChart();
+                    currentPhase = 'AWAITING_MARKER';
+                    
+                    // Continue parsing if more data available
+                    if (receivedData.length > 0) {
+                        parseReceivedData();
+                    }
+                }
+            }
+            
+            // Process IMU data
+            else if (currentPhase === 'IMU') {
+                while (receivedData.length >= 24 && imuData.length < expectedIMUCount) {
+                    const view = new DataView(receivedData.buffer, receivedData.byteOffset);
+                    imuData.push({
+                        accelX: view.getFloat32(0, true),
+                        accelY: view.getFloat32(4, true),
+                        accelZ: view.getFloat32(8, true),
+                        gyroX: view.getFloat32(12, true),
+                        gyroY: view.getFloat32(16, true),
+                        gyroZ: view.getFloat32(20, true)
+                    });
+                    receivedData = receivedData.slice(24);
+                }
+                
+                updateProgress();
+                document.getElementById('imuCount').textContent = imuData.length;
+                
+                if (imuData.length === expectedIMUCount) {
+                    log(`✓ IMU complete: ${imuData.length} samples`);
+                    updateIMUChart();
+                    currentPhase = 'AWAITING_MARKER';
+                    
+                    // Continue parsing if more data available
+                    if (receivedData.length > 0) {
+                        parseReceivedData();
+                    }
+                }
+            }
+            
+            // Process Temperature
+            else if (currentPhase === 'TEMP' && receivedData.length >= 4) {
+                const view = new DataView(receivedData.buffer, receivedData.byteOffset);
+                temperature = view.getFloat32(0, true);
+                log(`✓ Temperature: ${temperature.toFixed(2)}°C`);
+                document.getElementById('tempValue').textContent = temperature.toFixed(2);
+                receivedData = receivedData.slice(4);
+                currentPhase = 'COMPLETE';
+            }
+        }
+        
+        function updateProgress() {
+            const ppg1Progress = expectedPPGCount > 0 ? (ppg1Data.length / expectedPPGCount) * 33 : 0;
+            const ppg2Progress = expectedPPGCount > 0 ? (ppg2Data.length / expectedPPGCount) * 33 : 0;
+            const imuProgress = expectedIMUCount > 0 ? (imuData.length / expectedIMUCount) * 34 : 0;
+            const totalProgress = ppg1Progress + ppg2Progress + imuProgress;
+            progressBar.style.width = totalProgress + '%';
+        }
+        
+        function updatePPGChart() {
+            if (ppg1Data.length > 0 || ppg2Data.length > 0) {
+                const maxLen = Math.max(ppg1Data.length, ppg2Data.length);
+                const labels = Array.from({length: maxLen}, (_, i) => i);
+                
+                ppgChart.data.labels = labels;
+                ppgChart.data.datasets[0].data = ppg1Data;
+                ppgChart.data.datasets[1].data = ppg2Data;
+                ppgChart.update('none');
+            }
+        }
+        
+        function updateIMUChart() {
+            if (imuData.length > 0) {
+                const labels = Array.from({length: imuData.length}, (_, i) => i);
+                
+                imuChart.data.labels = labels;
+                imuChart.data.datasets[0].data = imuData.map(d => d.accelX);
+                imuChart.data.datasets[1].data = imuData.map(d => d.accelY);
+                imuChart.data.datasets[2].data = imuData.map(d => d.accelZ);
+                imuChart.update('none');
+            }
+        }
+        
+        // Download data as JSON
+        downloadBtn.addEventListener('click', () => {
+            const data = {
+                timestamp: new Date().toISOString(),
+                ppg1: ppg1Data,
+                ppg2: ppg2Data,
+                imu: imuData,
+                temperature: temperature
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sensor_data_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('✓ Data downloaded successfully');
+        });
+        
+        // Clear charts
+        clearBtn.addEventListener('click', () => {
+            ppg1Data = [];
+            ppg2Data = [];
+            imuData = [];
+            temperature = null;
+            
+            document.getElementById('ppg1Count').textContent = '0';
+            document.getElementById('ppg2Count').textContent = '0';
+            document.getElementById('imuCount').textContent = '0';
+            document.getElementById('tempValue').textContent = '--';
+            
+            updatePPGChart();
+            updateIMUChart();
+            progressBar.style.width = '0%';
+            
+            log('Charts cleared');
+        });
+        
+        // Initialize
+        initCharts();
+        log('System ready - Connect your device to begin');
+    </script>
+</body>
+</html>

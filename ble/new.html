@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPG + IMU BLE Data Collector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-dot.connected {
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.collecting {
+            background: #FF9800;
+            animation: pulse 1s infinite;
+        }
+
+        .status-dot.transmitting {
+            background: #2196F3;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-info {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-info:hover:not(:disabled) {
+            background: #0b7dda;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+        }
+
+        .btn-warning {
+            background: #FF9800;
+            color: white;
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background: #e68900;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-card h3 {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .info-card p {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        .log-entry.info { color: #4FC3F7; }
+        .log-entry.success { color: #81C784; }
+        .log-entry.warning { color: #FFB74D; }
+        .log-entry.error { color: #E57373; }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .progress-bar.active {
+            display: block;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .data-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .data-preview h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .data-table th {
+            background: #667eea;
+            color: white;
+            padding: 8px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+
+        .data-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .data-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-info {
+            background: #E3F2FD;
+            color: #1976D2;
+            border-left: 4px solid #2196F3;
+        }
+
+        .alert-warning {
+            background: #FFF3E0;
+            color: #E65100;
+            border-left: 4px solid #FF9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 PPG + IMU BLE Data Collector</h1>
+        <p class="subtitle">Arduino Nano 33 BLE - Structured Binary Protocol</p>
+
+        <div class="alert alert-info" id="bleAlert">
+            <strong>Note:</strong> This application requires a browser with Web Bluetooth support (Chrome, Edge, or Opera).
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <span id="deviceName">No device</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" id="connectBtn" onclick="connectBLE()">
+                📡 Connect to Device
+            </button>
+            <button class="btn-success" id="startBtn" onclick="startCollection()" disabled>
+                ▶️ Start Collection
+            </button>
+            <button class="btn-info" id="transmitBtn" onclick="requestTransmission()" disabled>
+                📤 Request Data
+            </button>
+            <button class="btn-warning" id="downloadBtn" onclick="downloadCSV()" disabled>
+                💾 Download CSV
+            </button>
+        </div>
+
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill">0%</div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>PPG Samples</h3>
+                <p id="ppgCount">0</p>
+            </div>
+            <div class="info-card">
+                <h3>IMU Samples</h3>
+                <p id="imuCount">0</p>
+            </div>
+            <div class="info-card">
+                <h3>Temperature</h3>
+                <p id="tempValue">--°C</p>
+            </div>
+            <div class="info-card">
+                <h3>Duration</h3>
+                <p id="duration">--s</p>
+            </div>
+        </div>
+
+        <div class="log-container" id="logContainer">
+            <div class="log-entry info">System ready. Click "Connect to Device" to begin.</div>
+        </div>
+
+        <div class="data-preview" id="dataPreview" style="display: none;">
+            <h3>📊 Data Preview (First 20 samples)</h3>
+            <table class="data-table" id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Index</th>
+                        <th>PPG1</th>
+                        <th>PPG2</th>
+                        <th>AccelX</th>
+                        <th>AccelY</th>
+                        <th>AccelZ</th>
+                        <th>GyroX</th>
+                        <th>GyroY</th>
+                        <th>GyroZ</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // BLE Service and Characteristic UUIDs (must match Arduino)
+        const SERVICE_UUID = '0000180d-0000-1000-8000-00805f9b34fb';
+        const CHAR_START_UUID = '00002a57-0000-1000-8000-00805f9b34fb';
+        const CHAR_TRANSMIT_UUID = '00002a58-0000-1000-8000-00805f9b34fb';
+        const CHAR_STATUS_UUID = '00002a59-0000-1000-8000-00805f9b34fb';
+
+        // Phase markers
+        const PHASE_PPG1 = 0xAA;
+        const PHASE_PPG2 = 0xBB;
+        const PHASE_IMU = 0xCC;
+        const PHASE_END = 0xDD;
+        const MAGIC_MARKER = 0xDEADBEEF;
+
+        // Global variables
+        let device = null;
+        let server = null;
+        let service = null;
+        let startChar = null;
+        let transmitChar = null;
+        let statusChar = null;
+
+        // Data storage
+        let collectedData = {
+            header: null,
+            ppg1: [],
+            ppg2: [],
+            imu: []
+        };
+
+        let receivingBuffer = [];
+        let currentPhase = 'header';
+        let expectedPPGCount = 0;
+        let expectedIMUCount = 0;
+
+        // UI Elements
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const deviceName = document.getElementById('deviceName');
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
+        const transmitBtn = document.getElementById('transmitBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const logContainer = document.getElementById('logContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+
+        // Check Web Bluetooth support
+        if (!navigator.bluetooth) {
+            document.getElementById('bleAlert').classList.add('show');
+            document.getElementById('bleAlert').className = 'alert alert-warning show';
+            document.getElementById('bleAlert').innerHTML = '<strong>Error:</strong> Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera.';
+            connectBtn.disabled = true;
+        }
+
+        // Connect to BLE device
+        async function connectBLE() {
+            try {
+                log('Scanning for BLE devices...', 'info');
+                
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'PPG_IMU_System' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                log(`Found device: ${device.name}`, 'success');
+                deviceName.textContent = device.name;
+
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+
+                log('Connecting to GATT server...', 'info');
+                server = await device.gatt.connect();
+
+                log('Getting service...', 'info');
+                service = await server.getPrimaryService(SERVICE_UUID);
+
+                log('Getting characteristics...', 'info');
+                startChar = await service.getCharacteristic(CHAR_START_UUID);
+                transmitChar = await service.getCharacteristic(CHAR_TRANSMIT_UUID);
+                statusChar = await service.getCharacteristic(CHAR_STATUS_UUID);
+
+                // Subscribe to notifications
+                await transmitChar.startNotifications();
+                transmitChar.addEventListener('characteristicvaluechanged', handleDataReceived);
+
+                await statusChar.startNotifications();
+                statusChar.addEventListener('characteristicvaluechanged', handleStatusChange);
+
+                updateStatus('connected', 'Connected');
+                startBtn.disabled = false;
+                connectBtn.disabled = true;
+
+                log('✓ Connected successfully!', 'success');
+
+            } catch (error) {
+                log(`Connection error: ${error}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // Disconnect handler
+        function onDisconnected() {
+            log('Device disconnected', 'warning');
+            updateStatus('disconnected', 'Disconnected');
+            device = null;
+            server = null;
+            service = null;
+            connectBtn.disabled = false;
+            startBtn.disabled = true;
+            transmitBtn.disabled = true;
+            deviceName.textContent = 'No device';
+        }
+
+        // Start data collection
+        async function startCollection() {
+            try {
+                log('Starting data collection...', 'info');
+                await startChar.writeValue(new Uint8Array([1]));
+                startBtn.disabled = true;
+                transmitBtn.disabled = true;
+                log('Collection started (20 seconds)', 'success');
+            } catch (error) {
+                log(`Error starting collection: ${error}`, 'error');
+            }
+        }
+
+        // Request data transmission
+        async function requestTransmission() {
+            try {
+                log('Requesting data transmission...', 'info');
+                
+                // Reset data structures
+                collectedData = {
+                    header: null,
+                    ppg1: [],
+                    ppg2: [],
+                    imu: []
+                };
+                receivingBuffer = [];
+                currentPhase = 'header';
+                
+                progressBar.classList.add('active');
+                updateProgress(0);
+                
+                await transmitChar.writeValue(new Uint8Array([1]));
+                transmitBtn.disabled = true;
+                
+                log('Transmission started', 'success');
+            } catch (error) {
+                log(`Error requesting transmission: ${error}`, 'error');
+            }
+        }
+
+        // Handle incoming data
+        function handleDataReceived(event) {
+            const value = event.target.value;
+            const bytes = new Uint8Array(value.buffer);
+            
+            // Add to buffer
+            receivingBuffer.push(...bytes);
+            
+            // Process based on current phase
+            processReceivedData();
+        }
+
+        // Process received data based on phase
+        function processReceivedData() {
+            if (currentPhase === 'header') {
+                // Wait for complete header (32 bytes)
+                if (receivingBuffer.length >= 32) {
+                    parseHeader();
+                    currentPhase = 'waiting_marker';
+                }
+            } else if (currentPhase === 'waiting_marker') {
+                if (receivingBuffer.length >= 1) {
+                    const marker = receivingBuffer[0];
+                    receivingBuffer.shift(); // Remove marker
+                    
+                    if (marker === PHASE_PPG1) {
+                        currentPhase = 'ppg1';
+                        log('Receiving PPG Sensor 1 data...', 'info');
+                    } else if (marker === PHASE_PPG2) {
+                        currentPhase = 'ppg2';
+                        log('Receiving PPG Sensor 2 data...', 'info');
+                    } else if (marker === PHASE_IMU) {
+                        currentPhase = 'imu';
+                        log('Receiving IMU data...', 'info');
+                    } else if (marker === PHASE_END) {
+                        currentPhase = 'complete';
+                        handleTransmissionComplete();
+                    }
+                }
+            } else if (currentPhase === 'ppg1') {
+                processPPG1Data();
+            } else if (currentPhase === 'ppg2') {
+                processPPG2Data();
+            } else if (currentPhase === 'imu') {
+                processIMUData();
+            }
+        }
+
+        // Parse header
+        function parseHeader() {
+            const headerBytes = receivingBuffer.splice(0, 32);
+            const view = new DataView(new Uint8Array(headerBytes).buffer);
+            
+            // Debug: Show first 8 bytes as hex
+            const debugHex = Array.from(headerBytes.slice(0, 8))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join(' ');
+            console.log('Header bytes (first 8):', debugHex);
+            
+            const magic = view.getUint32(0, true);
+            console.log('Parsed magic:', '0x' + magic.toString(16));
+            
+            if (magic !== MAGIC_MARKER) {
+                log(`Warning: Invalid magic marker: 0x${magic.toString(16)} (expected 0x${MAGIC_MARKER.toString(16)})`, 'warning');
+                // Continue anyway - might still work
+            }
+            
+            expectedPPGCount = view.getUint32(4, true);
+            expectedIMUCount = view.getUint32(8, true);
+            const avgTemp = view.getFloat32(12, true);
+            const timestamp = view.getUint32(16, true);
+            const duration = view.getUint32(20, true);
+            const ppgRate = view.getUint16(24, true);
+            const imuRate = view.getUint16(26, true);
+            
+            collectedData.header = {
+                magic,
+                ppgCount: expectedPPGCount,
+                imuCount: expectedIMUCount,
+                temperature: avgTemp,
+                timestamp,
+                duration,
+                ppgRate,
+                imuRate
+            };
+            
+            // Update UI
+            document.getElementById('ppgCount').textContent = expectedPPGCount;
+            document.getElementById('imuCount').textContent = expectedIMUCount;
+            document.getElementById('tempValue').textContent = avgTemp.toFixed(2) + '°C';
+            document.getElementById('duration').textContent = (duration / 1000).toFixed(1) + 's';
+            
+            log(`Header received: ${expectedPPGCount} PPG, ${expectedIMUCount} IMU samples`, 'success');
+        }
+
+        // Process PPG1 data
+        function processPPG1Data() {
+            while (receivingBuffer.length >= 4 && collectedData.ppg1.length < expectedPPGCount) {
+                const bytes = receivingBuffer.splice(0, 4);
+                const view = new DataView(new Uint8Array(bytes).buffer);
+                const value = view.getUint32(0, true);
+                collectedData.ppg1.push(value);
+                
+                if (collectedData.ppg1.length % 100 === 0) {
+                    const progress = (collectedData.ppg1.length / expectedPPGCount) * 25;
+                    updateProgress(progress);
+                }
+            }
+            
+            if (collectedData.ppg1.length >= expectedPPGCount) {
+                log(`PPG1 complete: ${collectedData.ppg1.length} samples`, 'success');
+                currentPhase = 'waiting_marker';
+            }
+        }
+
+        // Process PPG2 data
+        function processPPG2Data() {
+            while (receivingBuffer.length >= 4 && collectedData.ppg2.length < expectedPPGCount) {
+                const bytes = receivingBuffer.splice(0, 4);
+                const view = new DataView(new Uint8Array(bytes).buffer);
+                const value = view.getUint32(0, true);
+                collectedData.ppg2.push(value);
+                
+                if (collectedData.ppg2.length % 100 === 0) {
+                    const progress = 25 + (collectedData.ppg2.length / expectedPPGCount) * 25;
+                    updateProgress(progress);
+                }
+            }
+            
+            if (collectedData.ppg2.length >= expectedPPGCount) {
+                log(`PPG2 complete: ${collectedData.ppg2.length} samples`, 'success');
+                currentPhase = 'waiting_marker';
+            }
+        }
+
+        // Process IMU data
+        function processIMUData() {
+            while (receivingBuffer.length >= 24 && collectedData.imu.length < expectedIMUCount) {
+                const bytes = receivingBuffer.splice(0, 24);
+                const view = new DataView(new Uint8Array(bytes).buffer);
+                
+                const imuSample = {
+                    accelX: view.getFloat32(0, true),
+                    accelY: view.getFloat32(4, true),
+                    accelZ: view.getFloat32(8, true),
+                    gyroX: view.getFloat32(12, true),
+                    gyroY: view.getFloat32(16, true),
+                    gyroZ: view.getFloat32(20, true)
+                };
+                
+                collectedData.imu.push(imuSample);
+                
+                if (collectedData.imu.length % 10 === 0) {
+                    const progress = 50 + (collectedData.imu.length / expectedIMUCount) * 50;
+                    updateProgress(progress);
+                }
+            }
+            
+            if (collectedData.imu.length >= expectedIMUCount) {
+                log(`IMU complete: ${collectedData.imu.length} samples`, 'success');
+                currentPhase = 'waiting_marker';
+            }
+        }
+
+        // Handle transmission complete
+        function handleTransmissionComplete() {
+            updateProgress(100);
+            log('✓ Transmission complete!', 'success');
+            log(`Total: ${collectedData.ppg1.length} PPG1, ${collectedData.ppg2.length} PPG2, ${collectedData.imu.length} IMU`, 'success');
+            
+            downloadBtn.disabled = false;
+            
+            // Show data preview
+            displayDataPreview();
+            
+            setTimeout(() => {
+                progressBar.classList.remove('active');
+            }, 2000);
+        }
+
+        // Display data preview
+        function displayDataPreview() {
+            const preview = document.getElementById('dataPreview');
+            const tableBody = document.getElementById('dataTableBody');
+            
+            tableBody.innerHTML = '';
+            
+            const maxSamples = Math.max(collectedData.ppg1.length, collectedData.imu.length);
+            const displayCount = Math.min(20, maxSamples);
+            
+            for (let i = 0; i < displayCount; i++) {
+                const row = tableBody.insertRow();
+                
+                row.insertCell(0).textContent = i;
+                row.insertCell(1).textContent = collectedData.ppg1[i] || '-';
+                row.insertCell(2).textContent = collectedData.ppg2[i] || '-';
+                
+                if (collectedData.imu[i]) {
+                    row.insertCell(3).textContent = collectedData.imu[i].accelX.toFixed(3);
+                    row.insertCell(4).textContent = collectedData.imu[i].accelY.toFixed(3);
+                    row.insertCell(5).textContent = collectedData.imu[i].accelZ.toFixed(3);
+                    row.insertCell(6).textContent = collectedData.imu[i].gyroX.toFixed(3);
+                    row.insertCell(7).textContent = collectedData.imu[i].gyroY.toFixed(3);
+                    row.insertCell(8).textContent = collectedData.imu[i].gyroZ.toFixed(3);
+                } else {
+                    for (let j = 0; j < 6; j++) {
+                        row.insertCell(3 + j).textContent = '-';
+                    }
+                }
+            }
+            
+            preview.style.display = 'block';
+        }
+
+        // Download data as CSV
+        function downloadCSV() {
+            let csv = 'Index,PPG1,PPG2,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ\n';
+            
+            const maxLength = Math.max(collectedData.ppg1.length, collectedData.imu.length);
+            
+            for (let i = 0; i < maxLength; i++) {
+                csv += i + ',';
+                csv += (collectedData.ppg1[i] || '') + ',';
+                csv += (collectedData.ppg2[i] || '') + ',';
+                
+                if (collectedData.imu[i]) {
+                    csv += collectedData.imu[i].accelX + ',';
+                    csv += collectedData.imu[i].accelY + ',';
+                    csv += collectedData.imu[i].accelZ + ',';
+                    csv += collectedData.imu[i].gyroX + ',';
+                    csv += collectedData.imu[i].gyroY + ',';
+                    csv += collectedData.imu[i].gyroZ;
+                } else {
+                    csv += ',,,,,';
+                }
+                
+                csv += '\n';
+            }
+            
+            // Add metadata header
+            const metadata = `# Metadata\n# Temperature: ${collectedData.header.temperature}°C\n# Duration: ${collectedData.header.duration}ms\n# PPG Rate: ${collectedData.header.ppgRate}Hz\n# IMU Rate: ${collectedData.header.imuRate}Hz\n# Timestamp: ${collectedData.header.timestamp}\n\n`;
+            
+            const fullCSV = metadata + csv;
+            
+            const blob = new Blob([fullCSV], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ppg_imu_data_${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('CSV file downloaded', 'success');
+        }
+
+        // Handle status changes
+        function handleStatusChange(event) {
+            const value = event.target.value;
+            const decoder = new TextDecoder();
+            const status = decoder.decode(value);
+            
+            log(`Status: ${status}`, 'info');
+            
+            if (status === 'READY') {
+                transmitBtn.disabled = false;
+                startBtn.disabled = false;
+                updateStatus('ready', 'Ready to transmit');
+            } else if (status === 'COLLECTING') {
+                updateStatus('collecting', 'Collecting data...');
+            } else if (status === 'TRANSMITTING') {
+                updateStatus('transmitting', 'Transmitting...');
+            } else if (status === 'IDLE') {
+                updateStatus('connected', 'Connected');
+                startBtn.disabled = false;
+            }
+        }
+
+        // Update status UI
+        function updateStatus(state, text) {
+            statusDot.className = 'status-dot ' + state;
+            statusText.textContent = text;
+        }
+
+        // Update progress bar
+        function updateProgress(percent) {
+            progressFill.style.width = percent + '%';
+            progressFill.textContent = Math.round(percent) + '%';
+        }
+
+        // Log message
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
